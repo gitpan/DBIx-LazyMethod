@@ -1,11 +1,9 @@
 #!/usr/bin/perl -w
 
-# $Id: LazyMethod.t,v 1.1.1.1 2003/08/05 18:29:11 cwg Exp $
+# $Id: LazyMethod.t,v 1.2 2004/03/27 13:40:17 cwg Exp $
 
 use strict;
-use lib qw(lib ../lib);
 use Test::More tests => 5;
-use Data::Dumper;
 
 use constant DEBUG => 0;
 

@@ -1,19 +1,27 @@
 #!/usr/bin/perl -w
 
-# $Id: CSV.t,v 1.2 2004/03/27 13:40:17 cwg Exp $
+# $Id: Pg.t,v 1.1 2004/03/27 13:38:46 cwg Exp $
 
 use strict;
-#use lib qw(lib ../lib);
 use Test::More;
 use DBI;
 
-my $DBD = 'CSV'; #DBD to test
+unless (exists $ENV{'LM_TEST_DB'}) {
+	plan skip_all => "Set 'LM_TEST_DB' environment variable to run this test";
+}
+
+my $DBD = 'Pg'; #DBD to test
+
+my $DB_USER = 'postgres';
+my $DB_PASS = '';
+my $DB_DSN = "DBI:$DBD:dbname=template1";
+
 my @driver_names = DBI->available_drivers;
 
 unless (grep { $_ eq $DBD } @driver_names) {
 	plan skip_all => "Test irrelevant unless $DBD DBD is installed";
 } else {
-	plan tests => 15;
+	plan tests => 16;
 }
 
 use constant DEBUG => 0;
@@ -24,7 +32,7 @@ require_ok( 'DBIx::LazyMethod' );
 
         my %methods = (
                create_people_table => {
-                       sql => "CREATE TABLE people (id int NOT NULL PRIMARY KEY, name VARCHAR(255), alias INT)",
+                       sql => "CREATE TABLE people (id SERIAL, name VARCHAR(255), alias INT)",
                        args => [ qw() ],
                        ret => WANT_RETURN_VALUE,
                },
@@ -32,6 +40,13 @@ require_ok( 'DBIx::LazyMethod' );
                        sql => "DROP TABLE people",
                        args => [ qw() ],
                        ret => WANT_RETURN_VALUE,
+               },
+               drop_table => {
+                       sql => "DROP TABLE ?",
+                       args => [ qw(table) ],
+                       ret => WANT_RETURN_VALUE,
+		       noprepare => 1,
+		       noquote => 1,
                },
                create_people_entry => {
                        sql => "INSERT INTO people (name,alias) VALUES (?,?)",
@@ -72,9 +87,10 @@ require_ok( 'DBIx::LazyMethod' );
 
         my $db = DBIx::LazyMethod->new(
 #		data_source  => "DBI:Proxy:hostname=192.168.1.1;port=7015;dsn=DBI:Oracle:PERSONS",
-		data_source => "DBI:$DBD:",
-		user => 'csv',
-		pass => 'csv',
+#		data_source => "DBI:$DBD:dbname=template1",
+		data_source => $DB_DSN,
+		user => $DB_USER,
+		pass => $DB_PASS,
 		attr => { 'RaiseError' => 0, 'AutoCommit' => 1 },
 		methods => \%methods,
 		);
@@ -91,7 +107,7 @@ require_ok( 'DBIx::LazyMethod' );
         if ($db->is_error) { warn $db->{errormessage}."\nAborting..\n"; exit 0; }
 
 	print STDERR "Return for create_people_table: $rv0\n" if DEBUG;
-	is($rv0, '0E0', 'Test create table: no rows affected');
+	is($rv0, '-1', 'Test create table: no rows affected');
 
         my $rv1 = $db->create_people_entry(alias=>3,name=>'Johnny Login');
         if ($db->is_error) { warn $db->{errormessage}."\nAborting..\n"; exit 0; }
@@ -122,6 +138,12 @@ require_ok( 'DBIx::LazyMethod' );
 	
 	print STDERR "Return for get_people_entry_by_alias:\n" if DEBUG;
 	is(ref $ref0, 'HASH', 'Test get entry: 42, Arne Raket');
+        
+	my $ref01 = $db->get_people_entry_by_alias(alias=>-255);
+        if ($db->is_error) { warn $db->{errormessage}."\nAborting..\n"; exit 0; }
+	
+	print STDERR "Return for get_people_entry_by_alias:\n" if DEBUG;
+	is($ref01, undef, 'Test get entry: -255, undef');
 
         my ($rv5) = $db->get_people_alias_by_name(name=>'Johnny Login');
         if ($db->is_error) { warn $db->{errormessage}."\nAborting..\n"; exit 0; }
@@ -154,10 +176,12 @@ require_ok( 'DBIx::LazyMethod' );
 	print STDERR "Return for delete_people_entry_by_alias: $rv7\n" if DEBUG;
 	is($rv7, 1, 'Test entry delete success: 1');
 
-        my $rv8 = $db->drop_people_table();
+        #my $rv8 = $db->drop_people_table();
+        #if ($db->is_error) { warn $db->{errormessage}."\nAborting..\n"; exit 0; }
+        my $rv8 = $db->drop_table(table => 'people');
         if ($db->is_error) { warn $db->{errormessage}."\nAborting..\n"; exit 0; }
 
-	print STDERR "Return for drop_people_table: $rv8\n" if DEBUG;
+	print STDERR "Return for drop_table: $rv8\n" if DEBUG;
 	is($rv8, -1, 'Test drop table: unknown rows affected');
 
 	undef $db;

@@ -1,20 +1,29 @@
 #!/usr/bin/perl -w
 
-# $Id: MySQL.t,v 1.1.1.1 2003/08/05 18:29:11 cwg Exp $
+# $Id: MySQL.t,v 1.2 2004/03/27 13:40:17 cwg Exp $
 
 use strict;
-use lib qw(lib ../lib);
-use Data::Dumper;
 use Test::More;
 use DBI;
 
+unless (exists $ENV{'LM_TEST_DB'}) {
+        plan skip_all => "Set 'LM_TEST_DB' environment variable to run this test";
+}
+
 my $DBD = 'mysql'; #DBD to test
+                       
+my $DB_USER = 'mysql';
+my $DB_PASS = '';
+my $DB_DSN = "DBI:$DBD:test:localhost";
+
+
+
 my @driver_names = DBI->available_drivers;
 
 unless (grep { $_ eq $DBD } @driver_names) {
 	plan skip_all => "Test irrelevant unless $DBD DBD is installed";
 } else {
-	plan tests => 14;
+	plan tests => 15;
 }
 
 use constant DEBUG => 0;
@@ -28,6 +37,13 @@ require_ok( 'DBIx::LazyMethod' );
                        sql => "CREATE TABLE people (id int NOT NULL AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), alias INT, unique uix_alias (alias))",
                        args => [ qw() ],
                        ret => WANT_RETURN_VALUE,
+               },
+               drop_table => {
+                       sql => "DROP TABLE ?",
+                       args => [ qw(table) ],
+                       ret => WANT_RETURN_VALUE,
+		       noprepare => 1,
+		       noquote => 1,
                },
                drop_people_table => {
                        sql => "DROP TABLE IF EXISTS people",
@@ -77,16 +93,11 @@ require_ok( 'DBIx::LazyMethod' );
         );
 
         my $db = DBIx::LazyMethod->new(
-#		data_source  => "DBI:Proxy:hostname=192.168.1.1;port=7015;dsn=DBI:Oracle:PERSONS",
-#		data_source => "DBI:CSV:",
-#		user => 'csv',
-#		pass => 'csv',
-#		attr => { 'RaiseError' => 0, 'AutoCommit' => 1 },
-		data_source => "DBI:$DBD:test:localhost",
-		user => 'root',
-		pass => '',
-		attr => { 'RaiseError' => 0, 'AutoCommit' => 1 },
-		methods => \%methods,
+		data_source => 	$DB_DSN,
+		user => 	$DB_USER,
+		pass => 	$DB_PASS,
+		attr => 	{ 'RaiseError' => 0, 'AutoCommit' => 1 },
+		methods => 	\%methods,
 		);
 
 	is(ref $db, 'DBIx::LazyMethod', 'Test the constructed object');
@@ -131,28 +142,30 @@ require_ok( 'DBIx::LazyMethod' );
         if ($db->is_error) { warn $db->{errormessage}."\nAborting..\n"; exit 0; }
 	
 	print STDERR "Return for get_people_entry_by_alias:\n" if DEBUG;
-	print STDERR Dumper $ref0 if DEBUG;
 	is(ref $ref0, 'HASH', 'Test get entry: 42, Arne Raket');
+        
+	my $ref01 = $db->get_people_entry_by_alias(alias=>-255);
+        if ($db->is_error) { warn $db->{errormessage}."\nAborting..\n"; exit 0; }
+	
+	print STDERR "Return for get_people_entry_by_alias:\n" if DEBUG;
+	is($ref01, undef, 'Test get entry: undef');
 
         my ($rv5) = $db->get_people_alias_by_name(name=>'Johnny Login');
         if ($db->is_error) { warn $db->{errormessage}."\nAborting..\n"; exit 0; }
 	
 	print STDERR "Return for get_people_alias_by_name:\n" if DEBUG;
-	print STDERR Dumper $rv5 if DEBUG;
 	is($rv5, 3, 'Test get entry: 3, Johnny Login');
 
         my $ref1 = $db->get_all_people_entries();
         if ($db->is_error) { warn $db->{errormessage}."\nAborting..\n"; exit 0; }
 	
 	print STDERR "Return for get_all_people_entries:\n" if DEBUG;
-	print STDERR Dumper $ref1 if DEBUG;
 	is(ref $ref1, 'ARRAY', 'Test get all entries: ARRAY');
 
         my ($rv6) = $db->get_people_count();
         if ($db->is_error) { warn $db->{errormessage}."\nAborting..\n"; exit 0; }
 	
 	print STDERR "Return for get_people_count:\n" if DEBUG;
-	print STDERR Dumper $rv6 if DEBUG;
 	is($rv6, 3, 'Test entry count: 3');
 
 	print STDERR "\n[test] expect a warning here\n";
@@ -162,7 +175,9 @@ require_ok( 'DBIx::LazyMethod' );
 	print STDERR "Return for delete_people_entry_by_alias: $rv7\n" if DEBUG;
 	is($rv7, 1, 'Test entry delete success: 1');
 
-        my $rv8 = $db->drop_people_table();
+        #my $rv8 = $db->drop_people_table();
+        #if ($db->is_error) { warn $db->{errormessage}."\nAborting..\n"; exit 0; }
+        my $rv8 = $db->drop_table(table=>'people');
         if ($db->is_error) { warn $db->{errormessage}."\nAborting..\n"; exit 0; }
 
 	print STDERR "Return for drop_people_table: $rv8\n" if DEBUG;

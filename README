@@ -1,5 +1,4 @@
 DBIx::LazyMethod
 
-DBIx::LazyMethod - a lazy DBI encapsulation for simple dataset
-handling. "Code that DB.pm later (TM)"
+DBIx::LazyMethod - Quick and dirty OO interface to your data.
 
