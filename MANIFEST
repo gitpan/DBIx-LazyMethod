@@ -1,0 +1,10 @@
+INSTALL
+LICENSE
+MANIFEST			This list of files
+README
+Makefile.PL
+lib/DBIx/LazyMethod.pm
+t/LazyMethod.t
+t/MySQL.t
+t/CSV.t
+#test.pl
